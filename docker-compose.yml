@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  python_netapp:
+    image: python_netapp
+    container_name: python_netapp
+    build:
+      context: ./pythonnetapp
+    volumes:
+      - ./pythonnetapp:/usr/src/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    extra_hosts:
+      - host.docker.internal:host-gateway
+  nef_callback_server:
+    build:
+      context: ./nef_callback_server
+    ports:
+      - 8085:8080
+    volumes:
+      - ./nef_callback_server:/usr/src/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    extra_hosts:
+      - host.docker.internal:host-gateway
