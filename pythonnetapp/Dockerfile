@@ -1,9 +1,12 @@
-FROM nginx
-COPY ./src /usr/share/nginx/html
-# support running as arbitrary user which belogs to the root group
-RUN chmod g+rwx /var/cache/nginx /var/run /var/log/nginx
-# users are not allowed to listen on priviliged ports
-RUN sed -i.bak 's/listen\(.*\)80;/listen 80;/' /etc/nginx/conf.d/default.conf
-EXPOSE 80
-# comment user directive as master process is run as user in OpenShift anyhow
-RUN sed -i.bak 's/^user/#user/' /etc/nginx/nginx.conf
+FROM python:3.8
+ENV PYTHONUNBUFFERED 1
+
+RUN apt-get update
+
+RUN mkdir -p /usr/src/app
+WORKDIR /usr/src/app
+ADD requirements.txt /usr/src/app/
+RUN pip install -r requirements.txt
+ADD . /usr/src/app/
+
+CMD ["tail", "-f", "/dev/null"]
