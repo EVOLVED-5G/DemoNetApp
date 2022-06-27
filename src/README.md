@@ -1,2 +1,1 @@
-
-In this directory the developer will add his code and explain what his NetApp consists of.
+Here (in this directory), the developer will add the code and explain what the NetApp consists of.

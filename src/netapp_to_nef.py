@@ -50,6 +50,17 @@ def monitor_subscription(times, access_token):
     )
     monitoring_response = subscription.to_dict()
 
+    #all_subs = location_subscriber.get_all_subscriptions(netapp_id, 0, times)
+    
+    #print("{}\n".format(monitoring_response))
+
+    '''
+    for subs in all_subs:
+        id = subs.link.split("/")[-1]
+        #print("Deleting subscription with id: " + id)
+        location_subscriber.delete_subscription(netapp_id, id)
+        '''
+
     return monitoring_response
 
 
@@ -60,11 +71,11 @@ def sessionqos_subscription(access_token):
     qos_awereness = QosAwareness(host, access_token)
     equipment_network_identifier = "10.0.0.1"
     network_identifier = QosAwareness.NetworkIdentifier.IP_V4_ADDRESS
-    conversational_voice = QosAwareness.GBRQosReference.CONVERSATIONAL_VOICE
+    qos_reference = QosAwareness.NonGBRQosReference.LIVE_STREAMING
     # In this scenario we monitor UPLINK
     uplink = QosAwareness.QosMonitoringParameter.UPLINK
     # Minimum delay of data package during uplink, in milliseconds
-    uplink_threshold = 20
+    uplink_threshold = 10
     gigabyte = 1024 * 1024 * 1024
     # Up to 10 gigabytes 5 GB downlink, 5gb uplink
     usage_threshold = UsageThreshold(duration=None,  # not supported
@@ -74,16 +85,16 @@ def sessionqos_subscription(access_token):
                                      )
     notification_destination = emulator_utils.get_callback_server_for_nef_responses()
 
-    subscription = qos_awereness.create_guaranteed_bit_rate_subscription(
+    subscription = qos_awereness.create_non_guaranteed_bit_rate_subscription(
         netapp_id=netapp_id,
         equipment_network_identifier=equipment_network_identifier,
         network_identifier=network_identifier,
         notification_destination=notification_destination,
-        gbr_qos_reference=conversational_voice,
-        usage_threshold=usage_threshold,
-        qos_monitoring_parameter=uplink,
-        threshold=uplink_threshold,
-        wait_time_between_reports=10
+        non_gbr_qos_reference=qos_reference,
+        usage_threshold=usage_threshold
+        #qos_monitoring_parameter=uplink,
+        #threshold=uplink_threshold,
+        #wait_time_between_reports=10
     )
 
     qos_awereness_response = subscription.to_dict()
@@ -105,6 +116,36 @@ def qos_characteristics(access_token):
     parsed = json.loads(response.text)
 
     return parsed
+
+def delete_all_subscriptions():
+
+    netapp_id = "myNetapp"
+    host = emulator_utils.get_host_of_the_nef_emulator()
+    token = emulator_utils.get_token()
+    qos_awareness = QosAwareness(host, token.access_token)
+    location_subscriber = LocationSubscriber(host, token.access_token)
+
+    try:
+        all_subscriptions = qos_awareness.get_all_subscriptions(netapp_id)
+        all_subs = location_subscriber.get_all_subscriptions(netapp_id, 0, 100)
+        #print(all_subscriptions)
+        #print(all_subs)
+
+        for subscription in all_subscriptions:
+            id = subscription.link.split("/")[-1]
+            #print("Deleting QoS subscription with id: " + id)
+            qos_awareness.delete_subscription(netapp_id, id)
+    
+        for subs in all_subs:
+            id = subs.link.split("/")[-1]
+            #print("Deleting location subscription with id: " + id)
+            location_subscriber.delete_subscription(netapp_id, id)
+
+    except ApiException as ex:
+        if ex.status == 404:
+            print("No active transcriptions found")
+        else: #something else happened, re-throw the exception
+            raise
 
 
 def qos_profiles(access_token):
@@ -144,8 +185,8 @@ if __name__ == '__main__':
         nef_access_token = r.get('nef_access_token')
         ans = input("Do you want to test Monitoring Event API? (Y/n) ")
         if ans == "Y" or ans == 'y':
-            times = input("Number of location monitoring callbacks: ")
-            last_response_from_nef = monitor_subscription(int(times), nef_access_token)
+            #times = input("Number of location monitoring callbacks: ")
+            last_response_from_nef = monitor_subscription(int(100), nef_access_token)
             r.set('last_response_from_nef', str(last_response_from_nef))
             print("{}\n".format(last_response_from_nef))
     except Exception as e:
@@ -159,18 +200,24 @@ if __name__ == '__main__':
             last_response_from_nef = sessionqos_subscription(nef_access_token)
             r.set('last_response_from_nef', str(last_response_from_nef))
             print("{}\n".format(last_response_from_nef))
-            print("\n---- IMPORTANT ----")
-            print("To delete QoS subscription, execute the following command (from a host that can see NEF IP and 'curl' is installed):\n")
             sub_resource = last_response_from_nef['link']
-            print("curl --request DELETE {} --header 'Authorization: Bearer {}'".format(sub_resource, nef_access_token))
-            print("\n-------------------\n")
+
     except Exception as e:
         status_code = e.args[1]
         print(e)
 
+
+    try:
+        delete_all_subscriptions ()
+            
+    except Exception as e:
+        status_code = e.args[1]
+        print(e)
+
+
     try:
         nef_access_token = r.get('nef_access_token')
-        ans = input("Do you want to test QoS Information APIs? (Y/n) ")
+        ans = input("Do you want to see the QoS Information option? (Y/n) ")
         if ans == "Y" or ans == 'y':
             last_response_from_nef = qos_characteristics(nef_access_token)
             r.set('last_response_from_nef', str(last_response_from_nef))
